@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { authApi, usersApi } from '../services/companyApi';
 
 function AuthSuccess() {
   const [searchParams] = useSearchParams();
@@ -8,28 +9,65 @@ function AuthSuccess() {
   const [status, setStatus] = useState('Processing...');
 
   useEffect(() => {
-    const userId = searchParams.get('user_id');
-    const username = searchParams.get('username');
-    const email = searchParams.get('email');
+    const processAuth = async () => {
+      const userId = searchParams.get('user_id');
+      const username = searchParams.get('username');
+      const email = searchParams.get('email');
+      const accessToken = searchParams.get('token');
 
-    if (userId && username) {
-      // Save to localStorage
-      const user = {
-        id: userId,
-        username: username,
-        email: email || '',
-      };
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      setStatus('Success! Redirecting to dashboard...');
-      
-      // Redirect to dashboard
-      setTimeout(() => {
-        navigate('/app/dashboard', { replace: true });
-      }, 1500);
-    } else {
-      setError('Authentication failed. Missing user information.');
-    }
+      console.log('[AuthSuccess] Processing auth callback:', { userId, username, email, hasToken: !!accessToken });
+
+      if (accessToken) {
+        // Store token from OAuth callback
+        localStorage.setItem('token', accessToken);
+        console.log('[AuthSuccess] Token stored in localStorage');
+      }
+
+      if (userId && username) {
+        // Save user to localStorage
+        const user = {
+          id: userId,
+          username: username,
+          email: email || '',
+        };
+        localStorage.setItem('user', JSON.stringify(user));
+        console.log('[AuthSuccess] User stored in localStorage:', user);
+        
+        // Verify session with company API
+        try {
+          const verifyResponse = await authApi.verify();
+          console.log('[AuthSuccess] Session verified:', verifyResponse);
+          
+          // Optionally fetch full user profile
+          try {
+            const userProfile = await usersApi.getMe();
+            console.log('[AuthSuccess] User profile fetched:', userProfile);
+            // Update localStorage with full profile if available
+            if (userProfile) {
+              localStorage.setItem('user', JSON.stringify({
+                ...user,
+                ...userProfile,
+              }));
+            }
+          } catch (profileErr) {
+            console.log('[AuthSuccess] Could not fetch user profile (non-critical):', profileErr);
+          }
+        } catch (verifyErr) {
+          console.log('[AuthSuccess] Session verify skipped (may not be required):', verifyErr);
+        }
+        
+        setStatus('Success! Redirecting to dashboard...');
+        
+        // Redirect to dashboard
+        setTimeout(() => {
+          navigate('/app/dashboard', { replace: true });
+        }, 1500);
+      } else {
+        setError('Authentication failed. Missing user information.');
+      }
+    };
+
+    processAuth();
   }, [searchParams, navigate]);
 
   return (

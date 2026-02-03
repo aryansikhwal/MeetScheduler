@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authApi, usersApi } from '../services/companyApi';
 
 function Profile() {
   const navigate = useNavigate();
   
   // Get user from localStorage
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || '{}'));
+  const [loading, setLoading] = useState(false);
   const userId = user.id;
   const userEmail = user.email;
   const username = user.username;
@@ -15,9 +17,48 @@ function Profile() {
 
   const bookingLink = `${window.location.origin}/book/${username}`;
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    navigate('/');
+  // Fetch latest user profile on mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const userData = await usersApi.getMe();
+        console.log('[Profile] Fetched user data:', userData);
+        if (userData) {
+          const updatedUser = { ...user, ...userData };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+      } catch (err) {
+        console.error('[Profile] Failed to fetch user profile:', err.response?.data || err.message);
+        // Handle expired token - 401 is handled by interceptor
+        // For other errors, keep using cached user data
+        if (err.response?.status === 401) {
+          // Token expired, interceptor will redirect
+          return;
+        }
+      }
+    };
+    
+    // Only fetch if we have a token
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetchUserProfile();
+    }
+  }, []);
+
+  const handleLogout = async () => {
+    setLoading(true);
+    try {
+      await authApi.logout();
+      console.log('[Profile] Logout successful');
+    } catch (err) {
+      console.error('[Profile] Logout error:', err.response?.data || err.message);
+    } finally {
+      // Clear local storage regardless of API response
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      navigate('/');
+    }
   };
 
   const copySignature = () => {

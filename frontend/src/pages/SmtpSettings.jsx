@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+import { localApi } from '../services/companyApi';
 
 function SmtpSettings() {
   // Get user from localStorage
@@ -30,12 +29,13 @@ function SmtpSettings() {
 
   const fetchAccounts = async () => {
     try {
-      const response = await fetch(`${API_URL}/smtp/list?user_id=${userId}`);
-      if (!response.ok) throw new Error('Failed to load SMTP accounts');
-      const data = await response.json();
-      setAccounts(data.accounts);
+      const response = await localApi.get(`/smtp/list?user_id=${userId}`);
+      const data = response.data;
+      setAccounts(data.accounts || []);
+      console.log('[SmtpSettings] Fetched accounts:', data);
     } catch (err) {
-      setError(err.message);
+      console.error('[SmtpSettings] Failed to load accounts:', err.response?.data || err.message);
+      setError(err.response?.data?.detail || 'Failed to load SMTP accounts');
     } finally {
       setLoading(false);
     }
@@ -47,18 +47,15 @@ function SmtpSettings() {
     setSuccess('');
     
     try {
-      const response = await fetch(`${API_URL}/smtp/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          smtp_host: formData.smtp_host,
-          smtp_port: formData.smtp_port,
-          smtp_user: formData.smtp_user,
-          smtp_password: formData.smtp_password,
-        }),
+      const response = await localApi.post('/smtp/test', {
+        smtp_host: formData.smtp_host,
+        smtp_port: formData.smtp_port,
+        smtp_user: formData.smtp_user,
+        smtp_password: formData.smtp_password,
       });
       
-      const data = await response.json();
+      const data = response.data;
+      console.log('[SmtpSettings] Test result:', data);
       
       if (data.success) {
         setSuccess(data.message);
@@ -66,6 +63,7 @@ function SmtpSettings() {
         setError(data.message);
       }
     } catch (err) {
+      console.error('[SmtpSettings] Test failed:', err.response?.data || err.message);
       setError('Failed to test SMTP connection');
     } finally {
       setTesting(false);
@@ -79,16 +77,8 @@ function SmtpSettings() {
     setSuccess('');
     
     try {
-      const response = await fetch(`${API_URL}/smtp/add?user_id=${userId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || 'Failed to save SMTP account');
-      }
+      await localApi.post(`/smtp/add?user_id=${userId}`, formData);
+      console.log('[SmtpSettings] Account saved successfully');
       
       setSuccess('SMTP account saved successfully!');
       setFormData({
@@ -100,7 +90,8 @@ function SmtpSettings() {
       });
       fetchAccounts();
     } catch (err) {
-      setError(err.message);
+      console.error('[SmtpSettings] Save failed:', err.response?.data || err.message);
+      setError(err.response?.data?.detail || 'Failed to save SMTP account');
     } finally {
       setSaving(false);
     }
@@ -108,16 +99,14 @@ function SmtpSettings() {
 
   const handleSetActive = async (smtpId) => {
     try {
-      const response = await fetch(`${API_URL}/smtp/set-active/${smtpId}?user_id=${userId}`, {
-        method: 'POST',
-      });
-      
-      if (!response.ok) throw new Error('Failed to set active');
+      await localApi.post(`/smtp/set-active/${smtpId}?user_id=${userId}`);
+      console.log('[SmtpSettings] Set active:', smtpId);
       
       setSuccess('SMTP account set as active');
       fetchAccounts();
     } catch (err) {
-      setError(err.message);
+      console.error('[SmtpSettings] Set active failed:', err.response?.data || err.message);
+      setError(err.response?.data?.detail || 'Failed to set active');
     }
   };
 
@@ -125,16 +114,14 @@ function SmtpSettings() {
     if (!window.confirm('Are you sure you want to delete this SMTP account?')) return;
     
     try {
-      const response = await fetch(`${API_URL}/smtp/${smtpId}?user_id=${userId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) throw new Error('Failed to delete');
+      await localApi.delete(`/smtp/${smtpId}?user_id=${userId}`);
+      console.log('[SmtpSettings] Deleted:', smtpId);
       
       setSuccess('SMTP account deleted');
       fetchAccounts();
     } catch (err) {
-      setError(err.message);
+      console.error('[SmtpSettings] Delete failed:', err.response?.data || err.message);
+      setError(err.response?.data?.detail || 'Failed to delete');
     }
   };
 

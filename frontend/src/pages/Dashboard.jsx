@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+import { localApi, teamsApi } from '../services/companyApi';
 
 function Dashboard() {
   // Get user from localStorage
@@ -15,10 +14,12 @@ function Dashboard() {
     thisWeek: 0,
   });
   const [upcomingMeetings, setUpcomingMeetings] = useState([]);
+  const [team, setTeam] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchTeamData();
     
     // Auto-refresh every 30 seconds for real-time updates
     const interval = setInterval(() => {
@@ -28,12 +29,24 @@ function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const fetchTeamData = async () => {
+    try {
+      const teamData = await teamsApi.getMyTeam();
+      console.log('[Dashboard] Team data:', teamData);
+      setTeam(teamData || null);
+    } catch (err) {
+      // Handle empty team or failed fetch gracefully
+      console.error('[Dashboard] Failed to fetch team data:', err.response?.data || err.message);
+      setTeam(null);
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
-      // Fetch meetings for this user
-      const response = await fetch(`${API_URL}/meetings?user_id=${userId}`);
-      if (response.ok) {
-        const data = await response.json();
+      // Fetch meetings from local backend (not company API)
+      const response = await localApi.get(`/meetings?user_id=${userId}`);
+      if (response.status === 200) {
+        const data = response.data;
         const meetings = data.meetings || [];
         
         const now = new Date();
@@ -54,7 +67,7 @@ function Dashboard() {
         setUpcomingMeetings(upcoming.slice(0, 5));
       }
     } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
+      console.error('[Dashboard] Failed to fetch dashboard data:', err.response?.data || err.message);
     } finally {
       setLoading(false);
     }

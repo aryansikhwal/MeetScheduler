@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = process.env.REACT_APP_API_URL || process.env.REACT_APP_COMPANY_API_BASE_URL || 'http://localhost:8000';
 
 function ConnectGoogle() {
   const [username, setUsername] = useState('');
@@ -24,6 +24,7 @@ function ConnectGoogle() {
       return;
     }
     
+    console.log('[ConnectGoogle] Redirecting to Google OAuth for username:', username);
     // Redirect to Google OAuth
     window.location.href = `${API_URL}/auth/google?username=${encodeURIComponent(username)}`;
   };

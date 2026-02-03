@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+import { localApi } from '../services/companyApi';
 
 function BookingPage() {
   const { username } = useParams();
@@ -28,20 +27,21 @@ function BookingPage() {
 
   const fetchSlots = async () => {
     try {
-      const res = await fetch(`${API_URL}/availability/username/${username}?days=14`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error('User not found. Please check the booking link.');
-        }
-        throw new Error('Failed to load available slots');
-      }
-      const data = await res.json();
+      // Fetch availability from local backend
+      const response = await localApi.get(`/availability/username/${username}?days=14`);
+      const data = response.data;
       // Store host info and slots
       setHostId(data.host_id);
       setHostEmail(data.host_email);
       setSlots(data.available_slots || []);
+      console.log('[BookingPage] Fetched slots:', data);
     } catch (err) {
-      setError(err.message);
+      console.error('[BookingPage] Failed to fetch slots:', err.response?.data || err.message);
+      if (err.response?.status === 404) {
+        setError('User not found. Please check the booking link.');
+      } else {
+        setError('Failed to load available slots');
+      }
     } finally {
       setLoading(false);
     }
@@ -64,29 +64,23 @@ function BookingPage() {
     setSubmitting(true);
 
     try {
-      const res = await fetch(`${API_URL}/book`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          host_id: hostId,
-          start_time: selectedSlot.start,
-          end_time: selectedSlot.end,
-          customer_name: formData.name,
-          customer_email: formData.email,
-          title: `Meeting with ${formData.name}`
-        })
+      // Book meeting via local backend
+      const response = await localApi.post('/book', {
+        host_id: hostId,
+        start_time: selectedSlot.start,
+        end_time: selectedSlot.end,
+        customer_name: formData.name,
+        customer_email: formData.email,
+        title: `Meeting with ${formData.name}`
       });
 
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.detail || 'Failed to book meeting');
-      }
-
+      const data = response.data;
+      console.log('[BookingPage] Booking created:', data);
       setBookingResult(data);
       setBookingStep('success');
     } catch (err) {
-      setFormError(err.message);
+      console.error('[BookingPage] Failed to book meeting:', err.response?.data || err.message);
+      setFormError(err.response?.data?.detail || 'Failed to book meeting');
     } finally {
       setSubmitting(false);
     }

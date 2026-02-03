@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+import { localApi } from '../services/companyApi';
 
 function Calendar() {
   // Get user from localStorage
@@ -17,13 +16,14 @@ function Calendar() {
 
   const fetchMeetings = async () => {
     try {
-      const response = await fetch(`${API_URL}/meetings?user_id=${userId}`);
-      if (response.ok) {
-        const data = await response.json();
+      // Fetch meetings from local backend
+      const response = await localApi.get(`/meetings?user_id=${userId}`);
+      if (response.status === 200) {
+        const data = response.data;
         setMeetings(data.meetings || []);
       }
     } catch (err) {
-      console.error('Failed to fetch meetings:', err);
+      console.error('[Calendar] Failed to fetch meetings:', err.response?.data || err.message);
     } finally {
       setLoading(false);
     }
